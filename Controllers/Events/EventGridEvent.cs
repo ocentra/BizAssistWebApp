@@ -55,9 +55,12 @@ namespace BizAssistWebApp.Controllers.Events
         [JsonPropertyName("subject")]
         public string? Subject { get; set; }
 
-        public virtual Task<string?> ExecuteAsync(ILogger<IncomingCallController> logger)
+        public EventGridEvent()
         {
-            logger.LogInformation($"Event ID: {Id}, Event Type: {EventType}, Data: {JsonSerializer.Serialize(this)}");
+            
+        }
+        public virtual Task<string?> ExecuteAsync()
+        {
             return Task.FromResult<string?>(null);
         }
     }
@@ -67,10 +70,13 @@ namespace BizAssistWebApp.Controllers.Events
         [JsonPropertyName("data")]
         public ValidationData? Data { get; set; }
 
-        public override Task<string?> ExecuteAsync(ILogger<IncomingCallController> logger)
+        public EventGridValidationEvent()
+        {
+            
+        }
+        public override Task<string?> ExecuteAsync()
         {
             string? validationCode = Data?.ValidationCode;
-            logger.LogInformation($"Validation Code: {validationCode}");
             return Task.FromResult(validationCode);
         }
     }
@@ -82,6 +88,11 @@ namespace BizAssistWebApp.Controllers.Events
 
         [JsonPropertyName("validationUrl")]
         public string? ValidationUrl { get; set; }
+
+        public ValidationData()
+        {
+            
+        }
     }
 
     public class CallData
@@ -103,6 +114,11 @@ namespace BizAssistWebApp.Controllers.Events
 
         [JsonPropertyName("correlationId")]
         public string? CorrelationId { get; set; }
+
+        public CallData()
+        {
+            
+        }
     }
 
     public class CallEndpoint
@@ -115,11 +131,21 @@ namespace BizAssistWebApp.Controllers.Events
 
         [JsonPropertyName("phoneNumber")]
         public PhoneNumber? PhoneNumber { get; set; }
+
+        public CallEndpoint()
+        {
+            
+        }
     }
 
     public class PhoneNumber
     {
         [JsonPropertyName("value")]
         public string? Value { get; set; }
+
+        public PhoneNumber()
+        {
+            
+        }
     }
 }

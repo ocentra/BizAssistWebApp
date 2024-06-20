@@ -1,20 +1,56 @@
+using Azure.Communication.CallAutomation;
+using BizAssistWebApp.Controllers.Services;
 using BizAssistWebApp.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+
+// Load configuration
+ConfigurationManager configuration = builder.Configuration;
 
 // Add services to the container.
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+string connectionString = configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
     .AddEntityFrameworkStores<ApplicationDbContext>();
+
 builder.Services.AddControllersWithViews();
 
-var app = builder.Build();
+builder.Services.AddSingleton(new ConfigurationValues(configuration, builder.Environment));
+
+builder.Services.AddSingleton(sp =>
+{
+    var configValues = sp.GetRequiredService<ConfigurationValues>();
+    return new CallAutomationClient(configValues.CommunicationServicesConnectionString);
+});
+
+// Register the Speech services
+builder.Services.AddSingleton(sp =>
+{
+    var configValues = sp.GetRequiredService<ConfigurationValues>();
+    return new SpeechToTextService(configValues.SpeechKey, configValues.SpeechRegion);
+});
+builder.Services.AddSingleton(sp =>
+{
+    var configValues = sp.GetRequiredService<ConfigurationValues>();
+    return new TextToSpeechService(configValues.SpeechKey, configValues.SpeechRegion);
+});
+
+// Register the AssistantManager
+builder.Services.AddSingleton(sp =>
+{
+    var configValues = sp.GetRequiredService<ConfigurationValues>();
+    return new AssistantManager(configValues.AssistantIds);
+});
+
+// Register CallHandler
+builder.Services.AddScoped<CallHandler>();
+
+WebApplication app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

@@ -1,20 +1,23 @@
 ﻿using BizAssistWebApp.Controllers.Events;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using BizAssistWebApp.Controllers.Services;
+using Azure.Communication.CallAutomation;
 
 namespace BizAssistWebApp.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class IncomingCallController : ControllerBase
+    public class IncomingCallController(
+        ILogger<IncomingCallController> logger,
+        IConfiguration configuration,
+        SpeechToTextService speechToTextService,
+        TextToSpeechService textToSpeechService,
+        AssistantManager assistantManager,
+        CallAutomationClient callAutomationClient,
+        ConfigurationValues configValues)
+        : ControllerBase
     {
-        public static ILogger<IncomingCallController>? Logger;
-
-        public IncomingCallController(ILogger<IncomingCallController>? logger)
-        {
-            Logger = logger;
-        }
-
         [HttpPost]
         public async Task<IActionResult> Post()
         {
@@ -22,24 +25,24 @@ namespace BizAssistWebApp.Controllers
             using (StreamReader reader = new StreamReader(Request.Body))
             {
                 requestBody = await reader.ReadToEndAsync();
-                Logger?.LogInformation($"Request Body: {requestBody}");
+                logger.LogInformation($"Request Body: {requestBody}");
             }
 
             if (string.IsNullOrWhiteSpace(requestBody))
             {
-                Logger?.LogError("Empty request body received.");
+                logger.LogError("Empty request body received.");
                 return BadRequest("Request body is empty.");
             }
 
-            List<EventGridEvent> eventGridEvents = ParseEventGridEvents(requestBody, Logger);
+            List<EventGridEvent> eventGridEvents = ParseEventGridEvents(requestBody);
 
             if (!eventGridEvents.Any())
             {
-                Logger?.LogInformation("No events found in the request body.");
+                logger.LogInformation("No events found in the request body.");
                 return BadRequest("No events found.");
             }
 
-            Logger?.LogInformation($"Number of events received: {eventGridEvents.Count}");
+            logger.LogInformation($"Number of events received: {eventGridEvents.Count}");
 
             foreach (var evt in eventGridEvents)
             {
@@ -48,7 +51,7 @@ namespace BizAssistWebApp.Controllers
                     case EventType.SubscriptionValidationEvent:
                         if (evt is EventGridValidationEvent validationEvent)
                         {
-                            var validationCode = await validationEvent.ExecuteAsync(Logger);
+                            var validationCode = await validationEvent.ExecuteAsync();
                             if (!string.IsNullOrEmpty(validationCode))
                             {
                                 return Ok(new { validationResponse = validationCode });
@@ -59,12 +62,21 @@ namespace BizAssistWebApp.Controllers
                     case EventType.IncomingCall:
                         if (evt is EventGridIncomingCallEvent incomingCallEvent)
                         {
-                            await incomingCallEvent.ExecuteAsync(Logger);
+                            incomingCallEvent.Init(
+                                logger!,
+                                configuration,
+                                speechToTextService,
+                                textToSpeechService,
+                                callAutomationClient,
+                                assistantManager,
+                                configValues
+                            );
+                            await incomingCallEvent.ExecuteAsync();
                         }
                         break;
 
                     default:
-                        Logger?.LogWarning("Unknown event type!");
+                        logger?.LogWarning("Unknown event type!");
                         break;
                 }
             }
@@ -72,7 +84,7 @@ namespace BizAssistWebApp.Controllers
             return Ok("Welcome to Azure Web App!");
         }
 
-        private List<EventGridEvent> ParseEventGridEvents(string json, ILogger<IncomingCallController>? logger)
+        private List<EventGridEvent> ParseEventGridEvents(string json)
         {
             List<EventGridEvent> eventGridEvents = new();
 
@@ -86,24 +98,24 @@ namespace BizAssistWebApp.Controllers
                     {
                         foreach (JsonElement element in root.EnumerateArray())
                         {
-                            AddEventGridEvent(element, eventGridEvents, logger);
+                            AddEventGridEvent(element, eventGridEvents);
                         }
                     }
                     else if (root.ValueKind == JsonValueKind.Object)
                     {
-                        AddEventGridEvent(root, eventGridEvents, logger);
+                        AddEventGridEvent(root, eventGridEvents);
                     }
                 }
             }
             catch (Exception ex)
             {
-                logger?.LogError($"Error parsing JSON: {ex.Message}");
+                logger.LogError($"Error parsing JSON: {ex.Message}");
             }
 
             return eventGridEvents;
         }
 
-        private void AddEventGridEvent(JsonElement element, List<EventGridEvent> eventGridEvents, ILogger<IncomingCallController>? logger)
+        private void AddEventGridEvent(JsonElement element, List<EventGridEvent> eventGridEvents)
         {
             try
             {
@@ -118,21 +130,33 @@ namespace BizAssistWebApp.Controllers
                 switch (eventType)
                 {
                     case EventType.SubscriptionValidationEvent:
-                        eventGridEvents.Add(JsonSerializer.Deserialize<EventGridValidationEvent>(element.GetRawText()));
+                        EventGridValidationEvent? eventGridValidationEvent = JsonSerializer.Deserialize<EventGridValidationEvent>(element.GetRawText());
+                        if (eventGridValidationEvent != null)
+                        {
+                            eventGridEvents.Add(eventGridValidationEvent);
+                        }
                         break;
 
                     case EventType.IncomingCall:
-                        eventGridEvents.Add(JsonSerializer.Deserialize<EventGridIncomingCallEvent>(element.GetRawText()));
+                        EventGridIncomingCallEvent? eventGridIncomingCallEvent = JsonSerializer.Deserialize<EventGridIncomingCallEvent>(element.GetRawText());
+                        if (eventGridIncomingCallEvent != null)
+                        {
+                            eventGridEvents.Add(eventGridIncomingCallEvent);
+                        }
                         break;
 
                     default:
-                        eventGridEvents.Add(JsonSerializer.Deserialize<EventGridEvent>(element.GetRawText()));
+                        EventGridEvent? eventGridEvent = JsonSerializer.Deserialize<EventGridEvent>(element.GetRawText());
+                        if (eventGridEvent != null)
+                        {
+                            eventGridEvents.Add(eventGridEvent);
+                        }
                         break;
                 }
             }
             catch (Exception ex)
             {
-                logger?.LogError($"Error adding event: {ex.Message}");
+                logger.LogError($"Error adding event: {ex.Message}");
             }
         }
     }
