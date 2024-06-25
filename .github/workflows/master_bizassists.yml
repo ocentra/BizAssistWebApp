@@ -1,60 +1,50 @@
 name: Build and deploy ASP.Net Core app to Azure Web App - BizAssists
-
 on:
   push:
     branches:
       - master
-
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '8.0.x'
-
     - name: Restore dependencies
       run: dotnet restore BizAssistWebApp.csproj
-
     - name: Build with dotnet
       run: dotnet build BizAssistWebApp.csproj --configuration Release
-
     - name: Publish with dotnet
-      run: dotnet publish BizAssistWebApp.csproj -c Release -o D:\a\BizAssistWebApp\BizAssistWebApp\publish
-
+      run: dotnet publish BizAssistWebApp.csproj -c Release -o publish
     - name: Upload artifact for deployment job
       uses: actions/upload-artifact@v3
       with:
         name: .net-app
-        path: D:\a\BizAssistWebApp\BizAssistWebApp\publish
-
+        path: publish
   deploy:
     runs-on: windows-latest
     needs: build
-
     steps:
     - name: Download artifact from build job
       uses: actions/download-artifact@v3
       with:
         name: .net-app
-
+    - name: Log Workspace Contents
+      run: Get-ChildItem -Path "${{ github.workspace }}"
     - name: Validate Publish Directory
       run: |
-        if (!(Test-Path -Path "D:\a\BizAssistWebApp\BizAssistWebApp\publish")) {
+        if (!(Test-Path -Path "${{ github.workspace }}/.net-app/publish")) {
           Write-Error "Publish directory does not exist"
           exit 1
         }
-        Get-ChildItem -Path "D:\a\BizAssistWebApp\BizAssistWebApp\publish"
-
+        Get-ChildItem -Path "${{ github.workspace }}/.net-app/publish"
     - name: Deploy to Azure Web App using Web Deploy
       uses: azure/webapps-deploy@v2
       with:
         app-name: BizAssists
         slot-name: Production
-        package: D:\a\BizAssistWebApp\BizAssistWebApp\publish
+        package: ${{ github.workspace }}/.net-app/publish
         publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_C126A2E0516947F4A816EFCFEB460BC8 }}
