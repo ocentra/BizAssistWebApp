@@ -28,13 +28,13 @@ jobs:
         run: dotnet build BizAssistWebApp.csproj --configuration Release
 
       - name: dotnet publish
-        run: dotnet publish BizAssistWebApp.csproj -c Release -o ${{github.workspace}}\BizAssistWebApp\publish
+        run: dotnet publish BizAssistWebApp.csproj -c Release -o ${{github.workspace}}/publish
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v3
         with:
           name: .net-app
-          path: ${{github.workspace}}\BizAssistWebApp\publish
+          path: ${{github.workspace}}/publish
 
   deploy:
     runs-on: windows-latest
@@ -55,5 +55,5 @@ jobs:
         with:
           app-name: 'BizAssists'
           slot-name: 'Production'
-          package: ${{github.workspace}}\BizAssistWebApp\publish
+          package: ${{github.workspace}}/publish
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_C126A2E0516947F4A816EFCFEB460BC8 }}
