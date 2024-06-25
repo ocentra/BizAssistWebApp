@@ -19,6 +19,7 @@
   <ItemGroup>
     <PackageReference Include="Azure.AI.OpenAI.Assistants" Version="1.0.0-beta.4" />
     <PackageReference Include="Azure.Communication.PhoneNumbers" Version="1.3.0-beta.5" />
+    <PackageReference Include="Azure.Core" Version="1.40.0" />
     <PackageReference Include="Azure.Messaging.WebPubSub" Version="1.3.0" />
     <PackageReference Include="Azure.Messaging.WebPubSub.Client" Version="1.0.0" />
     <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.21.0" />
