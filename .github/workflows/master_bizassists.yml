@@ -20,7 +20,14 @@ jobs:
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '8.0'
-          include-prerelease: true
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Copy custom DLLs
+        run: |
+          mkdir -p ${{env.DOTNET_ROOT}}/libs
+          cp libs/* ${{env.DOTNET_ROOT}}/libs
 
       - name: Build with dotnet
         run: dotnet build --configuration Release

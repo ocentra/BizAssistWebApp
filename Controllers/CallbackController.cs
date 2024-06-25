@@ -92,6 +92,7 @@ namespace BizAssistWebApp.Controllers
 
         public async Task HandleParticipantsUpdateAsync(List<Participant> participants)
         {
+            await Task.Delay(10);
             logger.LogInformation($"Call participants {participants.Count}.");
 
         }

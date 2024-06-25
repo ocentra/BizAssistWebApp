@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>aspnet-BizAssistWebApp-585ec64e-bd71-4415-ac42-08fcff22ca53</UserSecretsId>
     <ApplicationInsightsResourceId>/subscriptions/1c90c7ec-71a7-4a89-b668-3c962d9266c3/resourceGroups/rg-BizAssistUSEastHub/providers/microsoft.insights/components/incommingCall</ApplicationInsightsResourceId>
+<RuntimeIdentifiers>win-x64;linux-x64;osx-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

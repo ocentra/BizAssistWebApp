@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using BizAssistWebApp.Models;
 
 namespace BizAssistWebApp.Controllers.Services;
 
@@ -20,7 +21,10 @@ public class AssistantManager
         {
             foreach (AssistantInfo assistant in assistantsArray)
             {
-                assistants.Add(assistant.name, assistant.id);
+                if (assistant is { Name: not null, Id: not null })
+                {
+                    assistants.Add(assistant.Name, assistant.Id);
+                }
             }
         }
 
@@ -53,8 +57,3 @@ public class AssistantManager
     }
 }
 
-public class AssistantInfo
-{
-    public string name { get; set; }
-    public string id { get; set; }
-}

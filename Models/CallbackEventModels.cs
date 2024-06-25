@@ -153,4 +153,14 @@ namespace BizAssistWebApp.Models
         [JsonPropertyName("silent")]
         public bool Silent { get; set; }
     }
+
+
+    public class AssistantInfo
+    {
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
+
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
+    }
 }
