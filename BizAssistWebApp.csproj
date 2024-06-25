@@ -38,7 +38,7 @@
 
   <ItemGroup>
     <Reference Include="Azure.Communication.CallAutomation">
-      <HintPath>..\..\azure-sdk-for-net\artifacts\bin\Azure.Communication.CallAutomation\Debug\netstandard2.0\Azure.Communication.CallAutomation.dll</HintPath>
+      <HintPath>libs\Azure.Communication.CallAutomation.dll</HintPath>
     </Reference>
   </ItemGroup>
 
