@@ -34,17 +34,17 @@ jobs:
         name: .net-app
     - name: Log Workspace Contents
       run: Get-ChildItem -Path "${{ github.workspace }}"
-    - name: Validate Publish Directory
+    - name: Validate Artifact Contents
       run: |
-        if (!(Test-Path -Path "${{ github.workspace }}/.net-app/publish")) {
-          Write-Error "Publish directory does not exist"
+        if (!(Test-Path -Path "${{ github.workspace }}/.net-app")) {
+          Write-Error "Artifact directory does not exist"
           exit 1
         }
-        Get-ChildItem -Path "${{ github.workspace }}/.net-app/publish"
+        Get-ChildItem -Path "${{ github.workspace }}/.net-app"
     - name: Deploy to Azure Web App using Web Deploy
       uses: azure/webapps-deploy@v2
       with:
         app-name: BizAssists
         slot-name: Production
-        package: ${{ github.workspace }}/.net-app/publish
+        package: ${{ github.workspace }}/.net-app
         publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_C126A2E0516947F4A816EFCFEB460BC8 }}
