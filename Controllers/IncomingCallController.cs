@@ -10,10 +10,6 @@ namespace BizAssistWebApp.Controllers
     [Route("api/[controller]")]
     public class IncomingCallController(
         ILogger<IncomingCallController> logger,
-        IConfiguration configuration,
-        SpeechToTextService speechToTextService,
-        TextToSpeechService textToSpeechService,
-        AssistantManager assistantManager,
         CallAutomationClient callAutomationClient,
         ConfigurationValues configValues)
         : ControllerBase
@@ -64,12 +60,9 @@ namespace BizAssistWebApp.Controllers
                         {
                             incomingCallEvent.Init(
                                 logger!,
-                                configuration,
-                                speechToTextService,
-                                textToSpeechService,
                                 callAutomationClient,
-                                assistantManager,
-                                configValues
+                                configValues,
+                                HttpContext
                             );
                             await incomingCallEvent.ExecuteAsync();
                         }

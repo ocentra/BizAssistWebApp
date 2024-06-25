@@ -24,31 +24,45 @@ builder.Services.AddSingleton(new ConfigurationValues(configuration, builder.Env
 
 builder.Services.AddSingleton(sp =>
 {
-    var configValues = sp.GetRequiredService<ConfigurationValues>();
+    ConfigurationValues configValues = sp.GetRequiredService<ConfigurationValues>();
     return new CallAutomationClient(configValues.CommunicationServicesConnectionString);
 });
+
+
 
 // Register the Speech services
 builder.Services.AddSingleton(sp =>
 {
-    var configValues = sp.GetRequiredService<ConfigurationValues>();
+    ConfigurationValues configValues = sp.GetRequiredService<ConfigurationValues>();
     return new SpeechToTextService(configValues.SpeechKey, configValues.SpeechRegion);
 });
 builder.Services.AddSingleton(sp =>
 {
-    var configValues = sp.GetRequiredService<ConfigurationValues>();
+    ConfigurationValues configValues = sp.GetRequiredService<ConfigurationValues>();
     return new TextToSpeechService(configValues.SpeechKey, configValues.SpeechRegion);
 });
 
 // Register the AssistantManager
 builder.Services.AddSingleton(sp =>
 {
-    var configValues = sp.GetRequiredService<ConfigurationValues>();
+    ConfigurationValues configValues = sp.GetRequiredService<ConfigurationValues>();
     return new AssistantManager(configValues.AssistantIds);
 });
 
 // Register CallHandler
 builder.Services.AddScoped<CallHandler>();
+
+builder.Services.AddSingleton(sp =>
+{
+    ConfigurationValues configValues = sp.GetRequiredService<ConfigurationValues>();
+    SpeechToTextService speechToTextService = sp.GetRequiredService<SpeechToTextService>();
+    TextToSpeechService textToSpeechService = sp.GetRequiredService<TextToSpeechService>();
+    AssistantManager assistantManager = sp.GetRequiredService<AssistantManager>();
+    ILogger<WebSocketServer> logger = sp.GetRequiredService<ILogger<WebSocketServer>>();
+
+    return new WebSocketServer(configValues, logger, speechToTextService, textToSpeechService, assistantManager);
+});
+
 
 WebApplication app = builder.Build();
 
@@ -68,6 +82,32 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
+
+app.UseWebSockets();
+
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path == "/media-streaming")
+    {
+        if (context.WebSockets.IsWebSocketRequest)
+        {
+           
+            WebSocketServer webSocketServer = context.RequestServices.GetRequiredService<WebSocketServer>();
+            webSocketServer.WebSocket = await context.WebSockets.AcceptWebSocketAsync(); 
+            await webSocketServer.ProcessWebSocketAsync();
+        }
+        else
+        {
+            context.Response.StatusCode = 400;
+        }
+    }
+    else
+    {
+        await next();
+    }
+});
+
+
 
 app.UseAuthorization();
 

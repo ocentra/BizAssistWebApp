@@ -10,6 +10,10 @@ namespace BizAssistWebApp.Controllers.Services
         public string OpenAIEndpoint { get; }
         public string OpenAIKey { get; }
         public string AssistantIds { get; }
+        
+        public string WebPubSubConnectionString { get; }
+        public string HubName = "IncommingCallPubSub";
+        public string CallbackUri = "https://bizassists.azurewebsites.net/api/callback";
 
         private readonly IConfiguration _configuration;
 
@@ -33,6 +37,10 @@ namespace BizAssistWebApp.Controllers.Services
             OpenAIEndpoint = environment.IsDevelopment() ? GetConfigurationVariable("Azure:OpenAI:Endpoint") : GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
             OpenAIKey = environment.IsDevelopment() ? GetConfigurationVariable("Azure:OpenAI:ApiKey") : GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
             AssistantIds = environment.IsDevelopment() ? GetConfigurationVariable("Azure:OpenAI:AssistantIds") : GetEnvironmentVariable("AZURE_OPENAI_ASSISTANT_IDS");
+
+            WebPubSubConnectionString = environment.IsDevelopment() ? GetConfigurationVariable("Azure:PSTNPubSubConnectionString") : GetEnvironmentVariable("PSTN_PUBSUB_CONNECTION_STRING");
+
+            CallbackUri = environment.IsDevelopment() ? "https://localhost/api/callback" : "https://bizassists.azurewebsites.net/api/callback";
         }
 
         private string GetEnvironmentVariable(string key)
@@ -79,7 +87,8 @@ namespace BizAssistWebApp.Controllers.Services
                 "Azure:SpeechRegion",
                 "Azure:OpenAI:ApiKey",
                 "Azure:OpenAI:Endpoint",
-                "Azure:OpenAI:AssistantIds"
+                "Azure:OpenAI:AssistantIds",
+                "Azure:PSTNPubSubConnectionString"
             };
 
             foreach (string variable in requiredVariables)
@@ -100,7 +109,8 @@ namespace BizAssistWebApp.Controllers.Services
                 "AZURE_SPEECH_REGION",
                 "AZURE_OPENAI_API_KEY",
                 "AZURE_OPENAI_ENDPOINT",
-                "AZURE_OPENAI_ASSISTANT_IDS"
+                "AZURE_OPENAI_ASSISTANT_IDS",
+                "PSTN_PUBSUB_CONNECTION_STRING"
             };
 
             foreach (string variable in requiredVariables)

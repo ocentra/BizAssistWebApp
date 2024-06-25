@@ -1,9 +1,10 @@
 ﻿using Azure;
+using Azure.Communication.CallAutomation;
 using Azure.Communication.PhoneNumbers;
+using BizAssistWebApp.Controllers.Services;
+using BizAssistWebApp.Models;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using BizAssistWebApp.Controllers.Services;
-using Azure.Communication.CallAutomation;
 
 namespace BizAssistWebApp.Controllers.Events
 {
@@ -12,6 +13,8 @@ namespace BizAssistWebApp.Controllers.Events
         private PhoneNumbersClient? _phoneNumbersClient;
         private CallHandler? _callHandler;
         private ILogger<IncomingCallController>? _logger;
+
+        private HttpContext? _httpContext;
 
         private readonly JsonSerializerOptions _serializerOptions = new JsonSerializerOptions
         {
@@ -28,23 +31,17 @@ namespace BizAssistWebApp.Controllers.Events
 
         // Initialization method for setting up dependencies
         public void Init(ILogger<IncomingCallController> logger,
-            IConfiguration configuration,
-            SpeechToTextService speechToTextService,
-            TextToSpeechService textToSpeechService,
-            CallAutomationClient callAutomationClient,
-            AssistantManager assistantManager, ConfigurationValues configValues)
+            CallAutomationClient callAutomationClient, 
+            ConfigurationValues configValues,
+            HttpContext httpContext)
         {
             _logger = logger;
-
+            _httpContext = httpContext;
 
             _phoneNumbersClient = new PhoneNumbersClient(configValues.CommunicationServicesConnectionString);
             _callHandler = new CallHandler(
                 callAutomationClient,
                 logger,
-                configuration,
-                speechToTextService,
-                textToSpeechService,
-                assistantManager,
                 configValues);
         }
 
@@ -81,9 +78,9 @@ namespace BizAssistWebApp.Controllers.Events
             }
 
             // Use the CallHandler to answer the call
-            if (Data != null && _callHandler != null)
+            if (Data != null && _callHandler != null && _httpContext !=null)
             {
-                await _callHandler.AnswerCallAsync(Data);
+                await _callHandler.AnswerCallAsync(Data,_httpContext);
             }
 
             return null;

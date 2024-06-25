@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>aspnet-BizAssistWebApp-585ec64e-bd71-4415-ac42-08fcff22ca53</UserSecretsId>
+    <ApplicationInsightsResourceId>/subscriptions/1c90c7ec-71a7-4a89-b668-3c962d9266c3/resourceGroups/rg-BizAssistUSEastHub/providers/microsoft.insights/components/incommingCall</ApplicationInsightsResourceId>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -17,8 +18,10 @@
 
   <ItemGroup>
     <PackageReference Include="Azure.AI.OpenAI.Assistants" Version="1.0.0-beta.4" />
-    <PackageReference Include="Azure.Communication.CallAutomation" Version="1.2.0" />
     <PackageReference Include="Azure.Communication.PhoneNumbers" Version="1.3.0-beta.5" />
+    <PackageReference Include="Azure.Messaging.WebPubSub" Version="1.3.0" />
+    <PackageReference Include="Azure.Messaging.WebPubSub.Client" Version="1.0.0" />
+    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.21.0" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="8.0.6" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.6" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="8.0.6" />
@@ -30,6 +33,12 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0-preview.5.24306.7" />
     <PackageReference Include="System.Text.Json" Version="9.0.0-preview.5.24306.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Azure.Communication.CallAutomation">
+      <HintPath>..\..\azure-sdk-for-net\artifacts\bin\Azure.Communication.CallAutomation\Debug\netstandard2.0\Azure.Communication.CallAutomation.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>

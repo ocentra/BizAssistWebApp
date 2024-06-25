@@ -1,40 +1,99 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using BizAssistWebApp.Controllers.Services;
+using BizAssistWebApp.Models;
 using Microsoft.AspNetCore.Mvc;
-using BizAssistWebApp.Controllers.Services;
+using System.Text.Json;
 
 namespace BizAssistWebApp.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class CallbackController : ControllerBase
+    public class CallbackController(
+        ILogger<CallbackController> logger,
+        WebSocketServer webSocketServer) : ControllerBase
     {
-        private readonly ILogger<CallbackController> _logger;
-        private readonly CallHandler _callHandler;
-
-        public CallbackController(ILogger<CallbackController> logger, CallHandler callHandler)
-        {
-            _logger = logger;
-            _callHandler = callHandler;
-        }
-
         [HttpPost]
-        public async Task<IActionResult> HandleCallback([FromBody] CallbackEvent callbackEvent)
+        public async Task<IActionResult> HandleCallback()
         {
-            _logger.LogInformation($"Callback received: {System.Text.Json.JsonSerializer.Serialize(callbackEvent)}");
+            try
+            {
+                using (StreamReader reader = new StreamReader(Request.Body))
+                {
+                    string requestBody = await reader.ReadToEndAsync();
+                    logger.LogInformation($"Callback received with body: {requestBody}");
 
-            // Assuming the audio data is sent in the request body
-            Stream audioStream = Request.Body;
+                    CallbackEvent? callbackEvent = JsonSerializer.Deserialize<CallbackEvent>(requestBody);
 
-            // Pass the audio stream to CallHandler to process
-            await _callHandler.ProcessAudioStreamAsync(callbackEvent, audioStream);
+                    if (callbackEvent is { Data: not null })
+                    {
+                        string? dataCallConnectionId = callbackEvent.Data.CallConnectionId;
 
-            return Ok();
+                        if (callbackEvent.Type == "Microsoft.Communication.CallConnected")
+                        {
+                            if (webSocketServer.WebSocket == null)
+                            {
+                                if (HttpContext.WebSockets.IsWebSocketRequest)
+                                {
+
+                                    webSocketServer.WebSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+                                    await webSocketServer.ProcessWebSocketAsync();
+                                }
+                                else
+                                {
+                                    HttpContext.Response.StatusCode = 400;
+                                }
+
+                            }
+         
+
+
+                            logger.LogError(dataCallConnectionId != null
+                                ? $"CallConnected  dataCallConnectionId{dataCallConnectionId}"
+                                : $"CallConnected but no dataCallConnectionId");
+                        }
+                        else if (callbackEvent.Type == "Microsoft.Communication.CallDisconnected")
+                        {
+                            await webSocketServer.StopAsync();
+                            logger.LogInformation($"Call disconnected.");
+
+                        }
+                        else if (callbackEvent.Type == "Microsoft.Communication.ParticipantsUpdated")
+                        {
+                            List<Participant>? dataParticipants = callbackEvent.Data.Participants;
+                            if (dataParticipants != null)
+                            {
+                                await HandleParticipantsUpdateAsync(dataParticipants);
+                            }
+                            else
+                            {
+                                logger.LogError($"ParticipantsUpdated but no dataParticipants");
+                            }
+                        }
+                        else
+                        {
+                            logger.LogWarning($"Not defined type {callbackEvent.Type}");
+                        }
+                    }
+                    else
+                    {
+                        logger.LogError($"callbackEvent is {callbackEvent == null} or data is {callbackEvent?.Data == null}");
+                    }
+                }
+
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "An error occurred while processing the callback.");
+                return StatusCode(500, "Internal server error.");
+            }
         }
-    }
 
-    public class CallbackEvent
-    {
-        public string? EventType { get; set; }
-        public string? CallConnectionId { get; set; }
+
+
+        public async Task HandleParticipantsUpdateAsync(List<Participant> participants)
+        {
+            logger.LogInformation($"Call participants {participants.Count}.");
+
+        }
     }
 }
