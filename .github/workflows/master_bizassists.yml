@@ -24,12 +24,7 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore BizAssistWebApp.csproj
 
-      - name: Copy custom DLLs
-        run: |
-          if (-Not (Test-Path -Path "${{github.workspace}}\libs")) {
-            New-Item -ItemType Directory -Path "${{github.workspace}}\libs"
-          }
-          Copy-Item -Path libs\* -Destination "${{github.workspace}}\libs"
+
 
       - name: Build with dotnet
         run: dotnet build BizAssistWebApp.csproj --configuration Release
