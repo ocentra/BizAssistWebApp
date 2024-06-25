@@ -17,9 +17,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up .NET Core
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '3.1'
+          dotnet-version: '7.0'
           include-prerelease: true
 
       - name: Build with dotnet
