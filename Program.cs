@@ -1,6 +1,9 @@
+using Microsoft.ApplicationInsights.Extensibility.PerfCounterCollector.QuickPulse;
+using Microsoft.ApplicationInsights.DependencyCollector;
 using Azure.Communication.CallAutomation;
 using BizAssistWebApp.Controllers.Services;
 using BizAssistWebApp.Data;
+using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,8 +30,6 @@ builder.Services.AddSingleton(sp =>
     ConfigurationValues configValues = sp.GetRequiredService<ConfigurationValues>();
     return new CallAutomationClient(configValues.CommunicationServicesConnectionString);
 });
-
-
 
 // Register the Speech services
 builder.Services.AddSingleton(sp =>
@@ -63,6 +64,15 @@ builder.Services.AddSingleton(sp =>
     return new WebSocketServer(configValues, logger, speechToTextService, textToSpeechService, assistantManager);
 });
 
+// Add Application Insights
+builder.Services.AddApplicationInsightsTelemetry(options =>
+{
+    options.ConnectionString = configuration["ApplicationInsights:ConnectionString"];
+});
+
+// Add QuickPulseTelemetryModule for Live Metrics
+builder.Services.AddSingleton<ITelemetryModule, QuickPulseTelemetryModule>();
+builder.Services.AddSingleton<ITelemetryModule, DependencyTrackingTelemetryModule>();
 
 WebApplication app = builder.Build();
 
@@ -74,7 +84,6 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
@@ -91,9 +100,8 @@ app.Use(async (context, next) =>
     {
         if (context.WebSockets.IsWebSocketRequest)
         {
-           
             WebSocketServer webSocketServer = context.RequestServices.GetRequiredService<WebSocketServer>();
-            webSocketServer.WebSocket = await context.WebSockets.AcceptWebSocketAsync(); 
+            webSocketServer.WebSocket = await context.WebSockets.AcceptWebSocketAsync();
             await webSocketServer.ProcessWebSocketAsync();
         }
         else
@@ -106,8 +114,6 @@ app.Use(async (context, next) =>
         await next();
     }
 });
-
-
 
 app.UseAuthorization();
 
