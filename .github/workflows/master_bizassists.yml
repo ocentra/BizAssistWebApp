@@ -25,7 +25,7 @@ jobs:
         run: dotnet build BizAssistWebApp.csproj --configuration Release
 
       - name: dotnet publish
-        run: dotnet publish BizAssistWebApp.csproj -c Release -o ${{github.workspace}}/publish
+        run: dotnet publish BizAssistWebApp.csproj -c Release -o ${{github.workspace}}\publish
 
       - name: List published files for debugging
         run: dir ${{github.workspace}}\publish
@@ -50,7 +50,7 @@ jobs:
           name: .net-app
 
       - name: List downloaded files for debugging
-        run: dir ${{github.workspace}}\BizAssistWebApp\publish
+        run: dir ${{github.workspace}}\publish
 
       - name: Deploy to Azure Web App using Web Deploy
         id: deploy-to-webapp
@@ -58,5 +58,5 @@ jobs:
         with:
           app-name: 'BizAssists'
           slot-name: 'Production'
-          package: ${{github.workspace}}\BizAssistWebApp\publish
+          package: ${{github.workspace}}\publish
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_C126A2E0516947F4A816EFCFEB460BC8 }}
