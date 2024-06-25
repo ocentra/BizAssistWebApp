@@ -4,59 +4,57 @@ on:
   push:
     branches:
       - master
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Set up .NET Core
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '8.0'
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'
 
-      - name: Restore dependencies
-        run: dotnet restore BizAssistWebApp.csproj
+    - name: Restore dependencies
+      run: dotnet restore BizAssistWebApp.csproj
 
-      - name: Build with dotnet
-        run: dotnet build BizAssistWebApp.csproj --configuration Release
+    - name: Build with dotnet
+      run: dotnet build BizAssistWebApp.csproj --configuration Release
 
-      - name: dotnet publish
-        run: dotnet publish BizAssistWebApp.csproj -c Release -o ${{github.workspace}}\publish
+    - name: Publish with dotnet
+      run: dotnet publish BizAssistWebApp.csproj -c Release -o D:\a\BizAssistWebApp\BizAssistWebApp\publish
 
-      - name: List published files for debugging
-        run: dir ${{github.workspace}}\publish
-
-      - name: Upload artifact for deployment job
-        uses: actions/upload-artifact@v3
-        with:
-          name: .net-app
-          path: ${{github.workspace}}\publish
+    - name: Upload artifact for deployment job
+      uses: actions/upload-artifact@v3
+      with:
+        name: .net-app
+        path: D:\a\BizAssistWebApp\BizAssistWebApp\publish
 
   deploy:
     runs-on: windows-latest
     needs: build
-    environment:
-      name: 'Production'
-      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
 
     steps:
-      - name: Download artifact from build job
-        uses: actions/download-artifact@v3
-        with:
-          name: .net-app
+    - name: Download artifact from build job
+      uses: actions/download-artifact@v3
+      with:
+        name: .net-app
 
-      - name: List downloaded files for debugging
-        run: dir ${{github.workspace}}\publish
+    - name: Validate Publish Directory
+      run: |
+        if (!(Test-Path -Path "D:\a\BizAssistWebApp\BizAssistWebApp\publish")) {
+          Write-Error "Publish directory does not exist"
+          exit 1
+        }
+        Get-ChildItem -Path "D:\a\BizAssistWebApp\BizAssistWebApp\publish"
 
-      - name: Deploy to Azure Web App using Web Deploy
-        id: deploy-to-webapp
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: 'BizAssists'
-          slot-name: 'Production'
-          package: ${{github.workspace}}\publish
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_C126A2E0516947F4A816EFCFEB460BC8 }}
+    - name: Deploy to Azure Web App using Web Deploy
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: BizAssists
+        slot-name: Production
+        package: D:\a\BizAssistWebApp\BizAssistWebApp\publish
+        publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_C126A2E0516947F4A816EFCFEB460BC8 }}
