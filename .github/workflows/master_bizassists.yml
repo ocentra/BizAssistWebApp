@@ -26,8 +26,10 @@ jobs:
 
       - name: Copy custom DLLs
         run: |
-          mkdir -p ${{github.workspace}}\libs
-          cp libs\* ${{github.workspace}}\libs
+          if (-Not (Test-Path -Path "${{github.workspace}}\libs")) {
+            New-Item -ItemType Directory -Path "${{github.workspace}}\libs"
+          }
+          Copy-Item -Path libs\* -Destination "${{github.workspace}}\libs"
 
       - name: Build with dotnet
         run: dotnet build BizAssistWebApp.csproj --configuration Release
