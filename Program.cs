@@ -1,12 +1,10 @@
-using Microsoft.ApplicationInsights.Extensibility.PerfCounterCollector.QuickPulse;
-using Microsoft.ApplicationInsights.DependencyCollector;
-using Azure.Communication.CallAutomation;
 using BizAssistWebApp.Controllers.Services;
 using BizAssistWebApp.Data;
+using Microsoft.ApplicationInsights.DependencyCollector;
 using Microsoft.ApplicationInsights.Extensibility;
+using Microsoft.ApplicationInsights.Extensibility.PerfCounterCollector.QuickPulse;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -29,8 +27,9 @@ builder.Services.AddSingleton(new ConfigurationValues(configuration, builder.Env
 builder.Services.AddSingleton(sp =>
 {
     ConfigurationValues configValues = sp.GetRequiredService<ConfigurationValues>();
-    return new CallAutomationClient(configValues.CommunicationServicesConnectionString);
+    return new CommunicationTokenService(configValues.CommunicationServicesConnectionString);
 });
+
 
 // Register the Speech services
 builder.Services.AddSingleton(sp =>

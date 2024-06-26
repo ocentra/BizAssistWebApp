@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 using BizAssistWebApp.Controllers.Services;
 using Azure.Communication.CallAutomation;
+using Azure;
+using Microsoft.IdentityModel.Tokens;
 
 namespace BizAssistWebApp.Controllers
 {
@@ -10,8 +12,8 @@ namespace BizAssistWebApp.Controllers
     [Route("api/[controller]")]
     public class IncomingCallController(
         ILogger<IncomingCallController> logger,
-        CallAutomationClient callAutomationClient,
-        ConfigurationValues configValues)
+        ConfigurationValues configValues,
+        CommunicationTokenService tokenService)
         : ControllerBase
     {
         [HttpPost]
@@ -40,14 +42,14 @@ namespace BizAssistWebApp.Controllers
 
             logger.LogInformation($"Number of events received: {eventGridEvents.Count}");
 
-            foreach (var evt in eventGridEvents)
+            foreach (EventGridEvent evt in eventGridEvents)
             {
                 switch (evt.EventType)
                 {
                     case EventType.SubscriptionValidationEvent:
                         if (evt is EventGridValidationEvent validationEvent)
                         {
-                            var validationCode = await validationEvent.ExecuteAsync();
+                            string? validationCode = await validationEvent.ExecuteAsync();
                             if (!string.IsNullOrEmpty(validationCode))
                             {
                                 return Ok(new { validationResponse = validationCode });
@@ -58,13 +60,20 @@ namespace BizAssistWebApp.Controllers
                     case EventType.IncomingCall:
                         if (evt is EventGridIncomingCallEvent incomingCallEvent)
                         {
-                            incomingCallEvent.Init(
-                                logger!,
-                                callAutomationClient,
-                                configValues,
-                                HttpContext
-                            );
-                            await incomingCallEvent.ExecuteAsync();
+                            string? communicationServicesConnectionString = await GetCommunicationServicesConnectionString();
+                            if (communicationServicesConnectionString != null)
+                            {
+
+                                CallAutomationClient callAutomationClient = new CallAutomationClient(communicationServicesConnectionString);
+
+                                incomingCallEvent.Init(
+                                     logger!,
+                                     callAutomationClient,
+                                     configValues,
+                                     HttpContext
+                                 );
+                                await incomingCallEvent.ExecuteAsync();
+                            }
                         }
                         break;
 
@@ -77,6 +86,38 @@ namespace BizAssistWebApp.Controllers
             return Ok("Welcome to Azure Web App!");
         }
 
+        public async Task<string?> GetCommunicationServicesConnectionString()
+        {
+            if (string.IsNullOrEmpty(configValues.CommunicationServicesConnectionString))
+            {
+                throw new ArgumentException("Configuration values for communication services connection string cannot be null or empty.");
+            }
+
+            // Split the connection string to extract the endpoint
+            string[] parts = configValues.CommunicationServicesConnectionString.Split(';');
+
+
+
+            string? endpoint = parts.FirstOrDefault(p => p.StartsWith("endpoint=", StringComparison.OrdinalIgnoreCase));
+
+            if (string.IsNullOrEmpty(endpoint))
+            {
+                return null;
+            }
+
+            // Generate a new token
+            string token = await tokenService.GenerateTokenAsync();
+
+            if (string.IsNullOrEmpty(token))
+            {
+                return null;
+            }
+            // Construct and return the new connection string
+            return $"{endpoint};accesskey={token}";
+        }
+
+
+
         private List<EventGridEvent> ParseEventGridEvents(string json)
         {
             List<EventGridEvent> eventGridEvents = new();
@@ -85,7 +126,7 @@ namespace BizAssistWebApp.Controllers
             {
                 using (JsonDocument document = JsonDocument.Parse(json))
                 {
-                    var root = document.RootElement;
+                    JsonElement root = document.RootElement;
 
                     if (root.ValueKind == JsonValueKind.Array)
                     {
