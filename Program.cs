@@ -53,16 +53,7 @@ builder.Services.AddSingleton(sp =>
 // Register CallHandler
 builder.Services.AddScoped<CallHandler>();
 
-builder.Services.AddSingleton(sp =>
-{
-    ConfigurationValues configValues = sp.GetRequiredService<ConfigurationValues>();
-    SpeechToTextService speechToTextService = sp.GetRequiredService<SpeechToTextService>();
-    TextToSpeechService textToSpeechService = sp.GetRequiredService<TextToSpeechService>();
-    AssistantManager assistantManager = sp.GetRequiredService<AssistantManager>();
-    ILogger<WebSocketServer> logger = sp.GetRequiredService<ILogger<WebSocketServer>>();
-
-    return new WebSocketServer(configValues, logger, speechToTextService, textToSpeechService, assistantManager);
-});
+builder.Services.AddSingleton<IWebSocketServerFactory, WebSocketServerFactory>();
 
 // Add Application Insights
 builder.Services.AddApplicationInsightsTelemetry(options =>
@@ -102,7 +93,8 @@ app.Use(async (context, next) =>
     {
         if (context.WebSockets.IsWebSocketRequest)
         {
-            WebSocketServer webSocketServer = context.RequestServices.GetRequiredService<WebSocketServer>();
+            var webSocketServerFactory = context.RequestServices.GetRequiredService<IWebSocketServerFactory>();
+            var webSocketServer = webSocketServerFactory.Create(context);
             webSocketServer.WebSocket = await context.WebSockets.AcceptWebSocketAsync();
             await webSocketServer.ProcessWebSocketAsync();
             logger.LogInformation("WebSocket request processed at /media-streaming");

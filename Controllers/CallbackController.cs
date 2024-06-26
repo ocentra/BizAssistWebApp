@@ -14,7 +14,7 @@ namespace BizAssistWebApp.Controllers
         [HttpPost]
         public async Task<IActionResult> HandleCallback()
         {
-            if (HttpContext.Request.IsHttps && !HttpContext.WebSockets.IsWebSocketRequest)
+            if (HttpContext.Request.IsHttps)
             {
                 try
                 {
@@ -25,63 +25,56 @@ namespace BizAssistWebApp.Controllers
                         logger.LogInformation($"Callback received with body: {requestBody}");
                     }
 
-                    try
+                    if (!string.IsNullOrEmpty(requestBody))
                     {
-                        CallbackEvent? callbackEvent = JsonSerializer.Deserialize<CallbackEvent>(requestBody);
-                        if (callbackEvent is { Data: not null })
+                        try
                         {
-                            string? dataCallConnectionId = callbackEvent.Data.CallConnectionId;
-
-                            if (callbackEvent.Type == "Microsoft.Communication.CallConnected")
+                            CallbackEvent? callbackEvent = JsonSerializer.Deserialize<CallbackEvent>(requestBody);
+                            if (callbackEvent is { Data: not null })
                             {
-                                if (webSocketServer.WebSocket == null)
+                                string? dataCallConnectionId = callbackEvent.Data.CallConnectionId;
+
+                                if (callbackEvent.Type == "Microsoft.Communication.CallConnected")
                                 {
-                                    if (HttpContext.WebSockets.IsWebSocketRequest)
+                                    await webSocketServer.OpenAsync();
+
+                                    logger.LogInformation(dataCallConnectionId != null
+                                        ? $"CallConnected with dataCallConnectionId {dataCallConnectionId}"
+                                        : "CallConnected but no dataCallConnectionId");
+                                }
+                                else if (callbackEvent.Type == "Microsoft.Communication.CallDisconnected")
+                                {
+                                    await webSocketServer.StopAsync();
+                                    logger.LogInformation("Call disconnected.");
+                                }
+                                else if (callbackEvent.Type == "Microsoft.Communication.ParticipantsUpdated")
+                                {
+                                    List<Participant>? dataParticipants = callbackEvent.Data.Participants;
+                                    if (dataParticipants != null)
                                     {
-                                        webSocketServer.WebSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-                                        await webSocketServer.ProcessWebSocketAsync();
+                                        await HandleParticipantsUpdateAsync(dataParticipants);
                                     }
                                     else
                                     {
-                                        HttpContext.Response.StatusCode = 400;
+                                        logger.LogError("ParticipantsUpdated but no dataParticipants");
                                     }
-                                }
-
-                                logger.LogInformation(dataCallConnectionId != null
-                                    ? $"CallConnected with dataCallConnectionId {dataCallConnectionId}"
-                                    : "CallConnected but no dataCallConnectionId");
-                            }
-                            else if (callbackEvent.Type == "Microsoft.Communication.CallDisconnected")
-                            {
-                                await webSocketServer.StopAsync();
-                                logger.LogInformation("Call disconnected.");
-                            }
-                            else if (callbackEvent.Type == "Microsoft.Communication.ParticipantsUpdated")
-                            {
-                                List<Participant>? dataParticipants = callbackEvent.Data.Participants;
-                                if (dataParticipants != null)
-                                {
-                                    await HandleParticipantsUpdateAsync(dataParticipants);
                                 }
                                 else
                                 {
-                                    logger.LogError("ParticipantsUpdated but no dataParticipants");
+                                    logger.LogWarning($"Unhandled event type: {callbackEvent.Type}");
                                 }
                             }
                             else
                             {
-                                logger.LogWarning($"Unhandled event type: {callbackEvent.Type}");
+                                logger.LogError("callbackEvent is null or data is null");
                             }
                         }
-                        else
+                        catch (JsonException jsonEx)
                         {
-                            logger.LogError("callbackEvent is null or data is null");
+                            logger.LogError(jsonEx, "JSON deserialization error: Invalid JSON structure.");
                         }
                     }
-                    catch (JsonException jsonEx)
-                    {
-                        logger.LogError(jsonEx, "JSON deserialization error: Invalid JSON structure.");
-                    }
+
 
                     return Ok();
                 }
