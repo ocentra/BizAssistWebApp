@@ -5,6 +5,9 @@ using BizAssistWebApp.Controllers.Services;
 using Azure.Communication.CallAutomation;
 using Azure;
 using Microsoft.IdentityModel.Tokens;
+using Azure.Communication;
+using Azure.Core;
+using Azure.Identity;
 
 namespace BizAssistWebApp.Controllers
 {
@@ -12,8 +15,7 @@ namespace BizAssistWebApp.Controllers
     [Route("api/[controller]")]
     public class IncomingCallController(
         ILogger<IncomingCallController> logger,
-        ConfigurationValues configValues,
-        CommunicationTokenService tokenService)
+        ConfigurationValues configValues)
         : ControllerBase
     {
         [HttpPost]
@@ -60,20 +62,26 @@ namespace BizAssistWebApp.Controllers
                     case EventType.IncomingCall:
                         if (evt is EventGridIncomingCallEvent incomingCallEvent)
                         {
-                            string? communicationServicesConnectionString = await GetCommunicationServicesConnectionString();
-                            if (communicationServicesConnectionString != null)
+                            string[] parts = configValues.CommunicationServicesConnectionString.Split(';');
+                            
+                            string? endpoint = parts.FirstOrDefault(p => p.StartsWith("endpoint=", StringComparison.OrdinalIgnoreCase));
+
+                            if (!string.IsNullOrEmpty(endpoint))
                             {
+                                DefaultAzureCredential defaultAzureCredential = new DefaultAzureCredential();
+                                CallAutomationClient callAutomationClient = new CallAutomationClient(new Uri(endpoint), defaultAzureCredential);
+                                logger?.LogInformation($"CallAutomationClient created @ {endpoint} azureCredential {defaultAzureCredential}");
 
-                                CallAutomationClient callAutomationClient = new CallAutomationClient(communicationServicesConnectionString);
-
-                                incomingCallEvent.Init(
-                                     logger!,
-                                     callAutomationClient,
-                                     configValues,
-                                     HttpContext
-                                 );
+                                incomingCallEvent.Init(logger!, callAutomationClient, configValues, HttpContext);
                                 await incomingCallEvent.ExecuteAsync();
+
                             }
+                            else
+                            {
+                                logger?.LogError($"CallAutomationClient cannot be created @ {endpoint} is null {string.IsNullOrEmpty(endpoint)}");
+
+                            }
+
                         }
                         break;
 
@@ -86,35 +94,7 @@ namespace BizAssistWebApp.Controllers
             return Ok("Welcome to Azure Web App!");
         }
 
-        public async Task<string?> GetCommunicationServicesConnectionString()
-        {
-            if (string.IsNullOrEmpty(configValues.CommunicationServicesConnectionString))
-            {
-                throw new ArgumentException("Configuration values for communication services connection string cannot be null or empty.");
-            }
 
-            // Split the connection string to extract the endpoint
-            string[] parts = configValues.CommunicationServicesConnectionString.Split(';');
-
-
-
-            string? endpoint = parts.FirstOrDefault(p => p.StartsWith("endpoint=", StringComparison.OrdinalIgnoreCase));
-
-            if (string.IsNullOrEmpty(endpoint))
-            {
-                return null;
-            }
-
-            // Generate a new token
-            string token = await tokenService.GenerateTokenAsync();
-
-            if (string.IsNullOrEmpty(token))
-            {
-                return null;
-            }
-            // Construct and return the new connection string
-            return $"{endpoint};accesskey={token}";
-        }
 
 
 

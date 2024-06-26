@@ -3,10 +3,10 @@
     "http": {
       "commandName": "Project",
       "launchBrowser": true,
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "AZURE_COMMUNICATION_SERVICES_CONNECTION_STRING": "endpoint=https://bizassistcommunicationpaidcanada.canada.communication.azure.com/;accesskey=irawkeb4CX0KYscXX9W7CD/PcrbBCkwL/+09WoNHNlyLnQae1siyUQjdfGBMGGiGkftdMMMd8onsexx6nRe7+A=="
-      },
+        "environmentVariables": {
+            "ASPNETCORE_ENVIRONMENT": "Development",
+            "AZURE_COMMUNICATION_SERVICES_CONNECTION_STRING": "endpoint=https://bizassistcommunicationpaidcanada.canada.communication.azure.com/;accesskey=3DIjnFdiTvjJ8FdjBLI24P3gjhXZU6yNYzwP3bePiLAr0nYRIlHdJQQJ99AFACULyCpEP6bcAAAAAZCSwqo0"
+        },
       "dotnetRunMessages": true,
       "applicationUrl": "http://localhost:5253",
       "remoteDebugEnabled": true
@@ -14,10 +14,10 @@
     "https": {
       "commandName": "Project",
       "launchBrowser": true,
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "AZURE_COMMUNICATION_SERVICES_CONNECTION_STRING": "endpoint=https://bizassistcommunicationpaidcanada.canada.communication.azure.com/;accesskey=irawkeb4CX0KYscXX9W7CD/PcrbBCkwL/+09WoNHNlyLnQae1siyUQjdfGBMGGiGkftdMMMd8onsexx6nRe7+A=="
-      },
+        "environmentVariables": {
+            "ASPNETCORE_ENVIRONMENT": "Development",
+            "AZURE_COMMUNICATION_SERVICES_CONNECTION_STRING": "endpoint=https://bizassistcommunicationpaidcanada.canada.communication.azure.com/;accesskey=3DIjnFdiTvjJ8FdjBLI24P3gjhXZU6yNYzwP3bePiLAr0nYRIlHdJQQJ99AFACULyCpEP6bcAAAAAZCSwqo0"
+        },
       "dotnetRunMessages": true,
       "applicationUrl": "https://localhost:7185;http://localhost:5253",
       "remoteDebugEnabled": true

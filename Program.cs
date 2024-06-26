@@ -24,12 +24,6 @@ builder.Services.AddControllersWithViews();
 
 builder.Services.AddSingleton(new ConfigurationValues(configuration, builder.Environment));
 
-builder.Services.AddSingleton(sp =>
-{
-    ConfigurationValues configValues = sp.GetRequiredService<ConfigurationValues>();
-    return new CommunicationTokenService(configValues.CommunicationServicesConnectionString);
-});
-
 
 // Register the Speech services
 builder.Services.AddSingleton(sp =>
