@@ -60,13 +60,19 @@ namespace BizAssistWebApp.Controllers.Services
                 }
                 else if (result.MessageType == WebSocketMessageType.Close)
                 {
-                    await WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+                    await CloseWebSocketAsync();
                 }
             }
         }
 
         private async Task ProcessAudioStreamAsync(Stream audioStream)
         {
+            if (WebSocket == null)
+            {
+                logger.LogError("Error initializing WebSocket is null!");
+                return;
+            }
+
             try
             {
                 if (_assistantsClient != null)
@@ -85,9 +91,30 @@ namespace BizAssistWebApp.Controllers.Services
             }
             catch (Exception ex)
             {
-                logger.LogError($"Error processing the audio stream: {ex.Message}");
+                logger.LogWarning($"Error processing the audio stream: {ex.Message}");
+            }
+            finally
+            {
+                await CloseWebSocketAsync();
             }
         }
+
+        private async Task CloseWebSocketAsync()
+        {
+            if (WebSocket is { State: WebSocketState.Open })
+            {
+                try
+                {
+                    await WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+                    logger.LogInformation("WebSocket connection closed.");
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError($"Error closing WebSocket connection: {ex.Message}");
+                }
+            }
+        }
+
 
         private async Task StreamAssistantResponseAsync(string threadId)
         {
@@ -142,7 +169,14 @@ namespace BizAssistWebApp.Controllers.Services
 
         public async Task StopAsync()
         {
-            if (WebSocket is { State: WebSocketState.Open })
+
+            if (WebSocket == null)
+            {
+                logger.LogError("Error initializing WebSocket is null!");
+                return;
+            }
+            
+            if (WebSocket.State == WebSocketState.Open)
             {
                 await WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
                 logger.LogInformation("WebSocket connection closed.");
