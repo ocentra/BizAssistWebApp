@@ -6,6 +6,7 @@ using BizAssistWebApp.Data;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -53,9 +54,6 @@ builder.Services.AddSingleton(sp =>
 // Register CallHandler
 builder.Services.AddScoped<CallHandler>();
 
-builder.Services.AddSingleton<IWebSocketServerFactory, WebSocketServerFactory>();
-
-// Add Application Insights
 builder.Services.AddApplicationInsightsTelemetry(options =>
 {
     options.ConnectionString = configuration["ApplicationInsights:ConnectionString"];
@@ -64,6 +62,28 @@ builder.Services.AddApplicationInsightsTelemetry(options =>
 // Add QuickPulseTelemetryModule for Live Metrics
 builder.Services.AddSingleton<ITelemetryModule, QuickPulseTelemetryModule>();
 builder.Services.AddSingleton<ITelemetryModule, DependencyTrackingTelemetryModule>();
+
+// Add IHttpContextAccessor
+builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+
+// Register WebSocketServer as a singleton
+// Register WebSocketServer as a singleton
+builder.Services.AddSingleton(sp =>
+{
+    ConfigurationValues configValues = sp.GetRequiredService<ConfigurationValues>();
+    SpeechToTextService speechToTextService = sp.GetRequiredService<SpeechToTextService>();
+    TextToSpeechService textToSpeechService = sp.GetRequiredService<TextToSpeechService>();
+    AssistantManager assistantManager = sp.GetRequiredService<AssistantManager>();
+    ILogger<WebSocketServer> logger = sp.GetRequiredService<ILogger<WebSocketServer>>();
+    IHttpContextAccessor httpContextAccessor = sp.GetRequiredService<IHttpContextAccessor>();
+    return new WebSocketServer(configValues, logger, speechToTextService, textToSpeechService, assistantManager, httpContextAccessor);
+});
+
+
+
+
+// Add Application Insights
+
 
 WebApplication app = builder.Build();
 
@@ -87,16 +107,17 @@ app.UseWebSockets();
 
 app.Use(async (context, next) =>
 {
-    var logger = context.RequestServices.GetRequiredService<ILogger<WebApplication>>();
+    ILogger<WebApplication> logger = context.RequestServices.GetRequiredService<ILogger<WebApplication>>();
 
     if (context.Request.Path == "/media-streaming")
     {
         if (context.WebSockets.IsWebSocketRequest)
         {
-            var webSocketServerFactory = context.RequestServices.GetRequiredService<IWebSocketServerFactory>();
-            var webSocketServer = webSocketServerFactory.Create(context);
+            string uri = $"wss://{context.Request.Host}/media-streaming";
+            WebSocketServer webSocketServer = context.RequestServices.GetRequiredService<WebSocketServer>();
+            webSocketServer.Uri = uri ;
             webSocketServer.WebSocket = await context.WebSockets.AcceptWebSocketAsync();
-            await webSocketServer.ProcessWebSocketAsync();
+            await webSocketServer.InitWebSocketAsync();
             logger.LogInformation("WebSocket request processed at /media-streaming");
         }
         else

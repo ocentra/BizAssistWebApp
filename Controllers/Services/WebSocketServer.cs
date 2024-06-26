@@ -8,44 +8,70 @@ using System.Text.Json;
 
 namespace BizAssistWebApp.Controllers.Services
 {
-    public class WebSocketServer(
-        ConfigurationValues configValues,
-        ILogger<WebSocketServer> logger,
-        SpeechToTextService speechToTextService,
-        TextToSpeechService textToSpeechService,
-        AssistantManager assistantManager,
-        string uri)
+    public class WebSocketServer
     {
+        private readonly ConfigurationValues _configValues;
+        private readonly ILogger<WebSocketServer> _logger;
+        private readonly SpeechToTextService _speechToTextService;
+        private readonly TextToSpeechService _textToSpeechService;
+        private readonly AssistantManager _assistantManager;
+        private readonly IHttpContextAccessor _httpContextAccessor;
         private AssistantsClient? _assistantsClient;
-
+        public string? Uri { get; set; }
         public WebSocket? WebSocket { get; set; }
 
-        public async Task ProcessWebSocketAsync()
+        public WebSocketServer(
+            ConfigurationValues configValues,
+            ILogger<WebSocketServer> logger,
+            SpeechToTextService speechToTextService,
+            TextToSpeechService textToSpeechService,
+            AssistantManager assistantManager,
+            IHttpContextAccessor httpContextAccessor)
         {
-            if (WebSocket == null)
+            _configValues = configValues;
+            _logger = logger;
+            _speechToTextService = speechToTextService;
+            _textToSpeechService = textToSpeechService;
+            _assistantManager = assistantManager;
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        public async Task InitWebSocketAsync()
+        {
+            var context = _httpContextAccessor.HttpContext;
+            if (context == null)
             {
-                logger.LogError("Error initializing WebSocket is null!");
+                _logger.LogError("InitWebSocketAsync Failed: HttpContext is null");
                 return;
             }
+
+            Uri ??= $"wss://{context.Request.Host}/media-streaming";
+
+            WebSocket ??= await context.WebSockets.AcceptWebSocketAsync();
 
             if (_assistantsClient == null)
             {
                 try
                 {
-                    _assistantsClient = new AssistantsClient(new Uri(configValues.OpenAIEndpoint), new AzureKeyCredential(configValues.OpenAIKey));
+                    _assistantsClient = new AssistantsClient(new Uri(_configValues.OpenAIEndpoint), new AzureKeyCredential(_configValues.OpenAIKey));
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError($"Error initializing AssistantsClient: {ex.Message}");
+                    _logger.LogError($"Error initializing AssistantsClient: {ex.Message}");
                     _assistantsClient = null;
                     return;
                 }
             }
 
+            await ProcessWebSocketAsync(WebSocket);
+        }
+
+        private async Task ProcessWebSocketAsync(WebSocket webSocket)
+        {
             byte[] buffer = new byte[2048];
-            while (WebSocket.State == WebSocketState.Open)
+            while (webSocket.State == WebSocketState.Open)
             {
-                WebSocketReceiveResult result = await WebSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
                 if (result.MessageType == WebSocketMessageType.Text)
                 {
                     string json = Encoding.UTF8.GetString(buffer, 0, result.Count);
@@ -67,17 +93,11 @@ namespace BizAssistWebApp.Controllers.Services
 
         private async Task ProcessAudioStreamAsync(Stream audioStream)
         {
-            if (WebSocket == null)
-            {
-                logger.LogError("Error initializing WebSocket is null!");
-                return;
-            }
-
             try
             {
                 if (_assistantsClient != null)
                 {
-                    string callerText = await speechToTextService.ConvertSpeechToTextAsync(audioStream);
+                    string callerText = await _speechToTextService.ConvertSpeechToTextAsync(audioStream);
 
                     AssistantThread thread = await _assistantsClient.CreateThreadAsync();
                     await _assistantsClient.CreateMessageAsync(thread.Id, MessageRole.User, callerText);
@@ -86,12 +106,12 @@ namespace BizAssistWebApp.Controllers.Services
                 }
                 else
                 {
-                    logger.LogError("AssistantsClient is not valid. Cannot process the audio stream.");
+                    _logger.LogError("AssistantsClient is not valid. Cannot process the audio stream.");
                 }
             }
             catch (Exception ex)
             {
-                logger.LogWarning($"Error processing the audio stream: {ex.Message}");
+                _logger.LogWarning($"Error processing the audio stream: {ex.Message}");
             }
             finally
             {
@@ -106,15 +126,14 @@ namespace BizAssistWebApp.Controllers.Services
                 try
                 {
                     await WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-                    logger.LogInformation("WebSocket connection closed.");
+                    _logger.LogInformation("WebSocket connection closed.");
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError($"Error closing WebSocket connection: {ex.Message}");
+                    _logger.LogError($"Error closing WebSocket connection: {ex.Message}");
                 }
             }
         }
-
 
         private async Task StreamAssistantResponseAsync(string threadId)
         {
@@ -125,11 +144,11 @@ namespace BizAssistWebApp.Controllers.Services
             {
                 while (!responseCts.Token.IsCancellationRequested)
                 {
-                    if (textToSpeechService != null && responseQueue.TryDequeue(out string? responseChunk))
+                    if (_textToSpeechService != null && responseQueue.TryDequeue(out string? responseChunk))
                     {
                         if (!string.IsNullOrEmpty(responseChunk))
                         {
-                            await textToSpeechService.SpeakTextAsync(responseChunk);
+                            await _textToSpeechService.SpeakTextAsync(responseChunk);
                         }
                     }
                     await Task.Delay(100, responseCts.Token);
@@ -138,11 +157,11 @@ namespace BizAssistWebApp.Controllers.Services
 
             if (_assistantsClient == null)
             {
-                logger.LogError("Error answering the call: _assistantsClient is null.");
+                _logger.LogError("Error answering the call: _assistantsClient is null.");
                 return;
             }
 
-            CreateRunOptions runOptions = new CreateRunOptions(assistantManager.GetFirstOrDefaultAssistantId());
+            CreateRunOptions runOptions = new CreateRunOptions(_assistantManager.GetFirstOrDefaultAssistantId());
             Response<ThreadRun>? run = await _assistantsClient.CreateRunAsync(threadId, runOptions, responseCts.Token);
 
             while (run.Value.Status == RunStatus.Queued || run.Value.Status == RunStatus.InProgress)
@@ -169,17 +188,16 @@ namespace BizAssistWebApp.Controllers.Services
 
         public async Task StopAsync()
         {
-
             if (WebSocket == null)
             {
-                logger.LogError("Error initializing WebSocket is null!");
+                _logger.LogError("Error initializing WebSocket is null!");
                 return;
             }
-            
+
             if (WebSocket.State == WebSocketState.Open)
             {
                 await WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-                logger.LogInformation("WebSocket connection closed.");
+                _logger.LogInformation("WebSocket connection closed.");
             }
         }
 
@@ -187,41 +205,32 @@ namespace BizAssistWebApp.Controllers.Services
         {
             if (WebSocket is { State: WebSocketState.Open })
             {
-                logger.LogWarning("WebSocket connection is already open.");
+                _logger.LogWarning("WebSocket connection is already open.");
                 return;
             }
 
-            try
+            if (!string.IsNullOrEmpty(Uri))
             {
-                ClientWebSocket webSocket = new ClientWebSocket();
-                await webSocket.ConnectAsync(new Uri(uri), cancellationToken);
-                WebSocket = webSocket;
-                logger.LogInformation($"WebSocket connection established with {uri}.");
+                try
+                {
+                    ClientWebSocket webSocket = new ClientWebSocket();
+                    await webSocket.ConnectAsync(new Uri(Uri), cancellationToken);
+                    WebSocket = webSocket;
+                    _logger.LogInformation($"WebSocket connection established with {Uri}.");
+
+                    await ProcessWebSocketAsync(WebSocket);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Failed to open WebSocket connection to {Uri}.");
+                    await StopAsync();
+                }
             }
-            catch (Exception ex)
+            else
             {
-                logger.LogError(ex, $"Failed to open WebSocket connection to {uri}.");
+                _logger.LogError("Failed to open websocket! Uri is null!");
+                await StopAsync();
             }
-        }
-    }
-
-    public interface IWebSocketServerFactory
-    {
-        WebSocketServer Create(HttpContext context);
-    }
-
-    public class WebSocketServerFactory(
-        ConfigurationValues configValues,
-        ILogger<WebSocketServer> logger,
-        SpeechToTextService speechToTextService,
-        TextToSpeechService textToSpeechService,
-        AssistantManager assistantManager)
-        : IWebSocketServerFactory
-    {
-        public WebSocketServer Create(HttpContext context)
-        {
-            string uri = $"wss://{context.Request.Host}/media-streaming";
-            return new WebSocketServer(configValues, logger, speechToTextService, textToSpeechService, assistantManager, uri);
         }
     }
 }
