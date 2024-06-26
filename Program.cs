@@ -96,6 +96,8 @@ app.UseWebSockets();
 
 app.Use(async (context, next) =>
 {
+    var logger = context.RequestServices.GetRequiredService<ILogger<WebApplication>>();
+
     if (context.Request.Path == "/media-streaming")
     {
         if (context.WebSockets.IsWebSocketRequest)
@@ -103,14 +105,17 @@ app.Use(async (context, next) =>
             WebSocketServer webSocketServer = context.RequestServices.GetRequiredService<WebSocketServer>();
             webSocketServer.WebSocket = await context.WebSockets.AcceptWebSocketAsync();
             await webSocketServer.ProcessWebSocketAsync();
+            logger.LogInformation("WebSocket request processed at /media-streaming");
         }
         else
         {
             context.Response.StatusCode = 400;
+            logger.LogWarning("Non-WebSocket request received at /media-streaming");
         }
     }
     else
     {
+        logger.LogInformation($"HTTP request received at {context.Request.Path}");
         await next();
     }
 });

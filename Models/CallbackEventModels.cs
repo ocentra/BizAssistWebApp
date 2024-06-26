@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace BizAssistWebApp.Models
 {
@@ -98,7 +96,23 @@ namespace BizAssistWebApp.Models
 
         [JsonPropertyName("participants")]
         public List<Participant>? Participants { get; set; }
+
+        [JsonPropertyName("resultInformation")]
+        public ResultInformation? ResultInformation { get; set; }
     }
+
+    public class ResultInformation
+    {
+        [JsonPropertyName("code")]
+        public int Code { get; set; }
+
+        [JsonPropertyName("subCode")]
+        public int SubCode { get; set; }
+
+        [JsonPropertyName("message")]
+        public string? Message { get; set; }
+    }
+
 
     public class Participant
     {
