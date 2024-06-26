@@ -31,22 +31,66 @@ namespace BizAssistWebApp.Controllers
                     {
                         try
                         {
-                            // Deserialize to dynamic object using JsonDocument
                             using (JsonDocument document = JsonDocument.Parse(requestBody))
                             {
-                                // Log the entire JSON structure
-                                logger.LogInformation($"Deserialized JSON: {document.RootElement.ToString()}");
+                                // Log the type of root element
+                                logger.LogInformation($"Root element type: {document.RootElement.ValueKind}");
 
-                                // Optionally, you can access specific properties dynamically
-                                if (document.RootElement.TryGetProperty("type", out JsonElement typeElement))
+                                if (document.RootElement.ValueKind == JsonValueKind.Object)
                                 {
-                                    string eventType = typeElement.GetString();
-                                    logger.LogInformation($"Event Type: {eventType}");
+                                    JsonElement root = document.RootElement;
+
+                                    // Extract and log specific properties
+                                    if (root.TryGetProperty("type", out JsonElement typeElement))
+                                    {
+                                        string eventType = typeElement.GetString();
+                                        logger.LogInformation($"Event Type: {eventType}");
+
+                                        if (root.TryGetProperty("data", out JsonElement dataElement) && dataElement.ValueKind == JsonValueKind.Object)
+                                        {
+                                            if (dataElement.TryGetProperty("callConnectionId", out JsonElement callConnectionIdElement))
+                                            {
+                                                string callConnectionId = callConnectionIdElement.GetString();
+                                                logger.LogInformation($"Call Connection ID: {callConnectionId}");
+                                            }
+
+                                            // Handle specific event types
+                                            if (eventType == "Microsoft.Communication.CallConnected")
+                                            {
+                                                await webSocketServer.OpenAsync();
+                                                logger.LogInformation("CallConnected event processed.");
+                                            }
+                                            else if (eventType == "Microsoft.Communication.CallDisconnected")
+                                            {
+                                                await webSocketServer.StopAsync();
+                                                logger.LogInformation("Call disconnected event processed.");
+                                            }
+                                            else if (eventType == "Microsoft.Communication.ParticipantsUpdated")
+                                            {
+                                                if (dataElement.TryGetProperty("participants", out JsonElement participantsElement) && participantsElement.ValueKind == JsonValueKind.Array)
+                                                {
+                                                    var participants = JsonSerializer.Deserialize<List<Participant>>(participantsElement.GetRawText());
+                                                    await HandleParticipantsUpdateAsync(participants);
+                                                }
+                                            }
+                                            else
+                                            {
+                                                logger.LogWarning($"Unhandled event type: {eventType}");
+                                            }
+                                        }
+                                        else
+                                        {
+                                            logger.LogError("Data element is missing or is not an object.");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        logger.LogError("Event type is missing.");
+                                    }
                                 }
-                                if (document.RootElement.TryGetProperty("data", out JsonElement dataElement) && dataElement.TryGetProperty("callConnectionId", out JsonElement callConnectionIdElement))
+                                else
                                 {
-                                    string callConnectionId = callConnectionIdElement.GetString();
-                                    logger.LogInformation($"Call Connection ID: {callConnectionId}");
+                                    logger.LogError("Root element is not an object.");
                                 }
                             }
                         }
@@ -70,6 +114,7 @@ namespace BizAssistWebApp.Controllers
                 return StatusCode(400, "WebSocket requests are not supported at this endpoint.");
             }
         }
+
 
 
 
@@ -154,10 +199,10 @@ namespace BizAssistWebApp.Controllers
         //}
 
 
-        public async Task HandleParticipantsUpdateAsync(List<Participant> participants)
+        public async Task HandleParticipantsUpdateAsync(List<Participant>? participants)
         {
             await Task.Delay(10);
-            logger.LogInformation($"Call participants count: {participants.Count}.");
+            logger.LogInformation($"Call participants count: {participants?.Count}.");
         }
     }
 }
