@@ -4,18 +4,21 @@ using System.Text.Json;
 using BizAssistWebApp.Controllers.Services;
 using Azure.Communication.CallAutomation;
 using Azure;
-using Microsoft.IdentityModel.Tokens;
 using Azure.Communication;
 using Azure.Core;
 using Azure.Identity;
+using Azure.Communication.Identity;
+using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace BizAssistWebApp.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class IncomingCallController(
-        ILogger<IncomingCallController> logger,
-        ConfigurationValues configValues)
+    public class IncomingCallController(ILogger<IncomingCallController> logger, ConfigurationValues configValues)
         : ControllerBase
     {
         [HttpPost]
@@ -63,25 +66,30 @@ namespace BizAssistWebApp.Controllers
                         if (evt is EventGridIncomingCallEvent incomingCallEvent)
                         {
                             string[] parts = configValues.CommunicationServicesConnectionString.Split(';');
-                            
-                            string? endpoint = parts.FirstOrDefault(p => p.StartsWith("endpoint=", StringComparison.OrdinalIgnoreCase));
+
+                            string? endpoint = parts.FirstOrDefault(p => p.StartsWith("endpoint=", StringComparison.OrdinalIgnoreCase))?.Split('=')[1];
 
                             if (!string.IsNullOrEmpty(endpoint))
                             {
                                 DefaultAzureCredential defaultAzureCredential = new DefaultAzureCredential();
-                                CallAutomationClient callAutomationClient = new CallAutomationClient(new Uri(endpoint), defaultAzureCredential);
-                                logger?.LogInformation($"CallAutomationClient created @ {endpoint} azureCredential {defaultAzureCredential}");
+                                var identityClient = new CommunicationIdentityClient(new Uri(endpoint), defaultAzureCredential);
+
+                                Response<CommunicationUserIdentifier> user = await identityClient.CreateUserAsync();
+                                Response<AccessToken> tokenResponse = await identityClient.GetTokenAsync(user.Value, new[] { CommunicationTokenScope.VoIP });
+
+                                string token = tokenResponse.Value.Token;
+
+                                AccessTokenCredential tokenCredential = new AccessTokenCredential(token);
+                                CallAutomationClient callAutomationClient = new CallAutomationClient(new Uri(endpoint), tokenCredential);
+                                logger?.LogInformation($"CallAutomationClient created @ {endpoint} tokenCredential {tokenCredential}");
 
                                 incomingCallEvent.Init(logger!, callAutomationClient, configValues, HttpContext);
                                 await incomingCallEvent.ExecuteAsync();
-
                             }
                             else
                             {
-                                logger?.LogError($"CallAutomationClient cannot be created @ {endpoint} is null {string.IsNullOrEmpty(endpoint)}");
-
+                                logger?.LogError($"CallAutomationClient cannot be created because endpoint is null or empty.");
                             }
-
                         }
                         break;
 
@@ -93,10 +101,6 @@ namespace BizAssistWebApp.Controllers
 
             return Ok("Welcome to Azure Web App!");
         }
-
-
-
-
 
         private List<EventGridEvent> ParseEventGridEvents(string json)
         {
@@ -171,6 +175,21 @@ namespace BizAssistWebApp.Controllers
             catch (Exception ex)
             {
                 logger.LogError($"Error adding event: {ex.Message}");
+            }
+        }
+
+        public class AccessTokenCredential(string token) : TokenCredential
+        {
+            private readonly AccessToken _token = new(token, DateTimeOffset.UtcNow.AddHours(1)); // Adjust expiration as necessary
+
+            public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
+            {
+                return _token;
+            }
+
+            public override ValueTask<AccessToken> GetTokenAsync(TokenRequestContext requestContext, CancellationToken cancellationToken)
+            {
+                return new ValueTask<AccessToken>(_token);
             }
         }
     }
