@@ -71,8 +71,7 @@ namespace BizAssistWebApp.Controllers
 
                             if (!string.IsNullOrEmpty(endpoint))
                             {
-                                DefaultAzureCredential defaultAzureCredential = new DefaultAzureCredential();
-                                var identityClient = new CommunicationIdentityClient(new Uri(endpoint), defaultAzureCredential);
+                                var identityClient = new CommunicationIdentityClient(configValues.CommunicationServicesConnectionString);
 
                                 Response<CommunicationUserIdentifier> user = await identityClient.CreateUserAsync();
                                 Response<AccessToken> tokenResponse = await identityClient.GetTokenAsync(user.Value, new[] { CommunicationTokenScope.VoIP });
